@@ -250,6 +250,9 @@ private:
     status_t enableNativeBuffers_l(
             OMX_U32 portIndex, OMX_BOOL graphic, OMX_BOOL enable);
 
+    status_t storeMetaDataInBuffers(
+            OMX_U32 portIndex, OMX_BOOL enable, MetadataBufferType *type);
+
     status_t storeMetaDataInBuffers_l(
             OMX_U32 portIndex, OMX_BOOL enable, MetadataBufferType *type);
 

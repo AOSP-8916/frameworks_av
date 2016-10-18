@@ -687,6 +687,12 @@ status_t OMXNodeInstance::setPortMode(OMX_U32 portIndex, IOMX::PortMode mode) {
     CLOG_CONFIG(setPortMode, "%s(%d), port %d", asString(mode), mode, portIndex);
 
     switch (mode) {
+    case IOMX::kPortModeDynamicGrallocSource:
+    {
+        MetadataBufferType metaType = kMetadataBufferTypeGrallocSource;
+        return storeMetaDataInBuffers_l(portIndex, OMX_TRUE, &metaType);
+    }
+
     case IOMX::kPortModeDynamicANWBuffer:
     {
         if (portIndex == kPortIndexOutput) {
@@ -712,13 +718,17 @@ status_t OMXNodeInstance::setPortMode(OMX_U32 portIndex, IOMX::PortMode mode) {
         if (portIndex != kPortIndexInput) {
             CLOG_ERROR(setPortMode, BAD_VALUE,
                     "%s(%d) mode is only supported on input port", asString(mode), mode);
-            return BAD_VALUE;
+            //return BAD_VALUE;
         }
         (void)enableNativeBuffers_l(portIndex, OMX_TRUE /*graphic*/, OMX_FALSE);
         (void)enableNativeBuffers_l(portIndex, OMX_FALSE /*graphic*/, OMX_FALSE);
 
         MetadataBufferType metaType = kMetadataBufferTypeNativeHandleSource;
-        return storeMetaDataInBuffers_l(portIndex, OMX_TRUE, &metaType);
+        if (portIndex != kPortIndexInput) {
+            return storeMetaDataInBuffers_l(portIndex, OMX_FALSE, &metaType);
+        } else {
+            return storeMetaDataInBuffers_l(portIndex, OMX_TRUE, &metaType);
+        }
     }
 
     case IOMX::kPortModePresetSecureBuffer:
@@ -778,7 +788,7 @@ status_t OMXNodeInstance::setPortMode(OMX_U32 portIndex, IOMX::PortMode mode) {
         break;
     }
 
-    CLOG_ERROR(setPortMode, BAD_VALUE, "invalid port mode %d", mode);
+    CLOG_ERROR(setPortMode, BAD_VALUE, "invalid port mode %d / %d", mode, IOMX::kPortModeDynamicGrallocSource);
     return BAD_VALUE;
 }
 
@@ -868,6 +878,13 @@ status_t OMXNodeInstance::getGraphicBufferUsage(
     *usage = params.nUsage;
 
     return OK;
+}
+
+status_t OMXNodeInstance::storeMetaDataInBuffers(
+        OMX_U32 portIndex, OMX_BOOL enable, MetadataBufferType *type) {
+    Mutex::Autolock autolock(mLock);
+    CLOG_CONFIG(storeMetaDataInBuffers, "%s:%u en:%d", portString(portIndex), portIndex, enable);
+    return storeMetaDataInBuffers_l(portIndex, enable, type);
 }
 
 status_t OMXNodeInstance::storeMetaDataInBuffers_l(

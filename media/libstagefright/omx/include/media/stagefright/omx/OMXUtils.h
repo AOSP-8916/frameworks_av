@@ -72,6 +72,7 @@ inline static const char *asString(IOMX::PortMode mode, const char *def = "??") 
         case IOMX::kPortModeDynamicGrallocSource: return "DynamicGrallocSource";
         case IOMX::kPortModeDynamicANWBuffer:   return "DynamicANWBuffer";
         case IOMX::kPortModeDynamicNativeHandle:return "DynamicNativeHandle";
+        case IOMX::kPortModeDynamicCameraSource:return "DynamicCameraSource";
         default:                                return def;
     }
 }

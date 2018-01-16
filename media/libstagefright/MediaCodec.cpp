@@ -691,6 +691,7 @@ status_t MediaCodec::configure(
         const sp<Surface> &nativeWindow,
         const sp<ICrypto> &crypto,
         uint32_t flags) {
+    ALOGE("AdrianDC configure bypass");
     return configure(format, nativeWindow, crypto, NULL, flags);
 }
 
@@ -700,6 +701,7 @@ status_t MediaCodec::configure(
         const sp<ICrypto> &crypto,
         const sp<IDescrambler> &descrambler,
         uint32_t flags) {
+    ALOGE("AdrianDC configure 1");
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
 
     if (mAnalyticsItem != NULL) {
@@ -713,6 +715,7 @@ status_t MediaCodec::configure(
         }
     }
 
+    ALOGE("AdrianDC configure 2 %d", mIsVideo);
     if (mIsVideo) {
         format->findInt32("width", &mVideoWidth);
         format->findInt32("height", &mVideoHeight);
@@ -742,6 +745,7 @@ status_t MediaCodec::configure(
         }
     }
 
+    ALOGE("AdrianDC configure 3");
     msg->setMessage("format", format);
     msg->setInt32("flags", flags);
     msg->setObject("surface", surface);
@@ -761,6 +765,7 @@ status_t MediaCodec::configure(
     }
 
     // save msg for reset
+    ALOGE("AdrianDC configure 4");
     mConfigureMsg = msg;
 
     status_t err;
@@ -770,17 +775,23 @@ status_t MediaCodec::configure(
     MediaResource::SubType subtype =
             mIsVideo ? MediaResource::kVideoCodec : MediaResource::kAudioCodec;
     resources.push_back(MediaResource(type, subtype, 1));
+    ALOGE("AdrianDC configure 5");
     // Don't know the buffer size at this point, but it's fine to use 1 because
     // the reclaimResource call doesn't consider the requester's buffer size for now.
     resources.push_back(MediaResource(MediaResource::kGraphicMemory, 1));
+    ALOGE("AdrianDC configure 6");
     for (int i = 0; i <= kMaxRetry; ++i) {
+        ALOGE("AdrianDC configure 7");
         if (i > 0) {
+            ALOGE("AdrianDC configure 71");
             // Don't try to reclaim resource for the first time.
             if (!mResourceManagerService->reclaimResource(resources)) {
+                ALOGE("AdrianDC configure 72");
                 break;
             }
         }
 
+        ALOGE("AdrianDC configure 8");
         sp<AMessage> response;
         err = PostAndAwaitResponse(msg, &response);
         if (err != OK && err != INVALID_OPERATION) {
@@ -790,13 +801,17 @@ status_t MediaCodec::configure(
             // But don't reset if the err is INVALID_OPERATION, which means
             // the configure failure is due to wrong state.
 
+            ALOGE("AdrianDC configure failed with err 0x%08x, resetting...", err);
             ALOGE("configure failed with err 0x%08x, resetting...", err);
             reset();
         }
+        ALOGE("AdrianDC configure 9");
         if (!isResourceError(err)) {
+            ALOGE("AdrianDC configure 10");
             break;
         }
     }
+    ALOGE("AdrianDC configure 11");
     return err;
 }
 

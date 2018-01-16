@@ -1403,8 +1403,10 @@ MetadataBufferType CameraSource::metaDataStoredInVideoBuffers() const {
     ALOGV("metaDataStoredInVideoBuffers");
 
 #if !defined(TARGET_USES_MEDIA_EXTENSIONS) && defined(TARGET_HAS_LEGACY_CAMERA_HAL1)
+    ALOGE("AdrianDC kMetadataBufferTypeGrallocSource");
     return kMetadataBufferTypeGrallocSource;
 #endif
+    ALOGE("AdrianDC not kMetadataBufferTypeGrallocSource");
 
     // Output buffers will contain metadata if camera sends us buffer in metadata mode or via
     // buffer queue.

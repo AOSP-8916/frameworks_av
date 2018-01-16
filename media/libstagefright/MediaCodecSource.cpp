@@ -348,12 +348,15 @@ sp<MediaCodecSource> MediaCodecSource::Create(
         const sp<MediaSource> &source,
         const sp<PersistentSurface> &persistentSurface,
         uint32_t flags) {
+    ALOGE("AdrianDC Create 1");
     sp<MediaCodecSource> mediaSource = new MediaCodecSource(
             looper, format, source, persistentSurface, flags);
 
+    ALOGE("AdrianDC Create 2");
     if (mediaSource->init() == OK) {
         return mediaSource;
     }
+    ALOGE("AdrianDC Create 3");
     return NULL;
 }
 
@@ -453,7 +456,9 @@ MediaCodecSource::MediaCodecSource(
       mPausePending(false),
       mFirstSampleTimeUs(-1ll),
       mGeneration(0) {
+    ALOGE("AdrianDC lLooper = null ?");
     CHECK(mLooper != NULL);
+    ALOGE("AdrianDC lLooper != null !");
 
     AString mime;
     CHECK(mOutputFormat->findString("mime", &mime));
@@ -475,11 +480,15 @@ MediaCodecSource::~MediaCodecSource() {
 }
 
 status_t MediaCodecSource::init() {
+    ALOGE("AdrianDC init 1");
     status_t err = initEncoder();
 
+    ALOGE("AdrianDC init 2");
     if (err != OK) {
+        ALOGE("AdrianDC init 3");
         releaseEncoder();
     }
+    ALOGE("AdrianDC init 4");
 
     return err;
 }
@@ -491,6 +500,7 @@ status_t MediaCodecSource::initEncoder() {
     mCodecLooper = new ALooper;
     mCodecLooper->setName("codec_looper");
     mCodecLooper->start();
+    ALOGE("AdrianDC initEncoder 1");
 
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
         mOutputFormat->setInt32("create-input-buffers-suspended", 1);
@@ -504,17 +514,20 @@ status_t MediaCodecSource::initEncoder() {
             outputMIME.c_str(), true /* encoder */,
             ((mFlags & FLAG_PREFER_SOFTWARE_CODEC) ? MediaCodecList::kPreferSoftwareCodecs : 0),
             &matchingCodecs);
+    ALOGE("AdrianDC initEncoder 2");
 
     status_t err = NO_INIT;
     for (size_t ix = 0; ix < matchingCodecs.size(); ++ix) {
         mEncoder = MediaCodec::CreateByComponentName(
                 mCodecLooper, matchingCodecs[ix]);
+        ALOGE("AdrianDC initEncoder 3");
 
         if (mEncoder == NULL) {
             continue;
         }
 
         ALOGV("output format is '%s'", mOutputFormat->debugString(0).c_str());
+        ALOGE("AdrianDC output format is '%s'", mOutputFormat->debugString(0).c_str());
 
         mEncoderActivityNotify = new AMessage(kWhatEncoderActivity, mReflector);
         mEncoder->setCallback(mEncoderActivityNotify);
@@ -525,21 +538,28 @@ status_t MediaCodecSource::initEncoder() {
                     NULL /* crypto */,
                     MediaCodec::CONFIGURE_FLAG_ENCODE);
 
+        ALOGE("AdrianDC initEncoder 4");
         if (err == OK) {
+            ALOGE("AdrianDC initEncoder 5");
             break;
         }
+        ALOGE("AdrianDC initEncoder 6");
         mEncoder->release();
         mEncoder = NULL;
     }
 
+    ALOGE("AdrianDC initEncoder 7");
     if (err != OK) {
+        ALOGE("AdrianDC initEncoder 8");
         return err;
     }
 
+    ALOGE("AdrianDC initEncoder 9");
     mEncoder->getOutputFormat(&mOutputFormat);
     sp<MetaData> meta = new MetaData;
     convertMessageToMetaData(mOutputFormat, meta);
     mMeta.lock().set(meta);
+    ALOGE("AdrianDC initEncoder 10");
 
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
         CHECK(mIsVideo);
@@ -557,6 +577,7 @@ status_t MediaCodecSource::initEncoder() {
             return err;
         }
     }
+    ALOGE("AdrianDC initEncoder 11");
 
     sp<AMessage> inputFormat;
     int32_t usingSwReadOften;
@@ -576,7 +597,9 @@ status_t MediaCodecSource::initEncoder() {
         ALOGV("setting dataspace %#x, format %#x", mEncoderDataSpace, mEncoderFormat);
     }
 
+    ALOGE("AdrianDC initEncoder 12");
     err = mEncoder->start();
+    ALOGE("AdrianDC initEncoder 13");
 
     if (err != OK) {
         return err;
@@ -587,7 +610,7 @@ status_t MediaCodecSource::initEncoder() {
         output->mEncoderReachedEOS = false;
         output->mErrorCode = OK;
     }
-
+    ALOGE("AdrianDC initEncoder 15");
     return OK;
 }
 

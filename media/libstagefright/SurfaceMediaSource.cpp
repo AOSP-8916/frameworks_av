@@ -129,8 +129,10 @@ status_t SurfaceMediaSource::setFrameRate(int32_t fps)
 MetadataBufferType SurfaceMediaSource::metaDataStoredInVideoBuffers() const {
     ALOGV("isMetaDataStoredInVideoBuffers");
 #if !defined(TARGET_USES_MEDIA_EXTENSIONS) && defined(TARGET_HAS_LEGACY_CAMERA_HAL1)
+    ALOGE("AdrianDC kMetadataBufferTypeGrallocSource");
     return kMetadataBufferTypeGrallocSource;
 #else
+    ALOGE("AdrianDC kMetadataBufferTypeANWBuffer");
     return kMetadataBufferTypeANWBuffer;
 #endif
 }
@@ -292,6 +294,7 @@ void SurfaceMediaSource::passMetadataBuffer_l(MediaBuffer **buffer,
         ALOGE("Cannot allocate memory for metadata buffer!");
         return;
     }
+ALOGE("AdrianDC passMetadataBuffer_l");
     data->eType = metaDataStoredInVideoBuffers();
     data->pBuffer = bufferHandle;
     data->nFenceFd = -1;
@@ -424,9 +427,11 @@ void SurfaceMediaSource::signalBufferReturned(MediaBuffer *buffer) {
     Mutex::Autolock lock(mMutex);
 
     buffer_handle_t bufferHandle = getMediaBufferHandle(buffer);
-
+    ALOGE("AdrianDC signalBufferReturned 1");
     for (size_t i = 0; i < mCurrentBuffers.size(); i++) {
+        ALOGE("AdrianDC signalBufferReturned 2 %d", i);
         if ((buffer_handle_t)mCurrentBuffers[i]->getNativeBuffer() == bufferHandle) {
+            ALOGE("AdrianDC signalBufferReturned 3 %d", (int)bufferHandle);
             mCurrentBuffers.removeAt(i);
             foundBuffer = true;
             break;

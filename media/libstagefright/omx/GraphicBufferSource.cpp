@@ -776,13 +776,16 @@ status_t GraphicBufferSource::submitBuffer_l(const VideoBuffer &item) {
         return UNKNOWN_ERROR;
     }
 
+    ALOGE("AdrianDC before QCOM_BSP_LEGACY");
 #ifndef QCOM_BSP_LEGACY
+    ALOGE("AdrianDC is QCOM_BSP_LEGACY");
     if ((android_dataspace)item.mDataspace != mLastDataspace) {
         onDataspaceChanged_l(
                 item.mDataspace,
                 (android_pixel_format)item.mBuffer->getGraphicBuffer()->format);
     }
 #endif
+    ALOGE("AdrianDC after QCOM_BSP_LEGACY");
 
     std::shared_ptr<AcquiredBuffer> buffer = item.mBuffer;
     // use a GraphicBuffer for now as OMXNodeInstance is using GraphicBuffers to hold references

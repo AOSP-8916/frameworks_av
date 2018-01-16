@@ -581,11 +581,14 @@ void CameraClient::releaseRecordingFrameHandleBatch(const std::vector<native_han
 
 status_t CameraClient::setVideoBufferMode(int32_t videoBufferMode) {
     LOG1("setVideoBufferMode: %d", videoBufferMode);
+    ALOGE("AdrianDC setVideoBufferMode: %d", videoBufferMode);
     bool enableMetadataInBuffers = false;
 
     if (videoBufferMode == VIDEO_BUFFER_MODE_DATA_CALLBACK_METADATA) {
+        ALOGE("AdrianDC setVideoBufferMode: METADATA");
         enableMetadataInBuffers = true;
     } else if (videoBufferMode != VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV) {
+        ALOGE("AdrianDC setVideoBufferMode: !YUV");
         ALOGE("%s: %d: videoBufferMode %d is not supported.", __FUNCTION__, __LINE__,
                 videoBufferMode);
         return BAD_VALUE;
@@ -593,6 +596,7 @@ status_t CameraClient::setVideoBufferMode(int32_t videoBufferMode) {
 
     Mutex::Autolock lock(mLock);
     if (checkPidAndHardware() != NO_ERROR) {
+        ALOGE("AdrianDC setVideoBufferMode: error");
         return UNKNOWN_ERROR;
     }
 

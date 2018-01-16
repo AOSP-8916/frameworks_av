@@ -569,6 +569,7 @@ ACodec::ACodec()
     mPortEOS[kPortIndexInput] = mPortEOS[kPortIndexOutput] = false;
     mInputEOSResult = OK;
 
+    ALOGE("AdrianDC ACodec Messed up %d with %d (%s)", mPortMode[kPortIndexInput], IOMX::kPortModePresetByteBuffer, mComponentName.c_str());
     mPortMode[kPortIndexInput] = IOMX::kPortModePresetByteBuffer;
     mPortMode[kPortIndexOutput] = IOMX::kPortModePresetByteBuffer;
 
@@ -811,6 +812,7 @@ status_t ACodec::handleSetSurface(const sp<Surface> &surface) {
 }
 
 status_t ACodec::setPortMode(int32_t portIndex, IOMX::PortMode mode) {
+    ALOGE("AdrianDC setPortMode IN mode %d (%s)", mode, mComponentName.c_str());
     status_t err = mOMXNode->setPortMode(portIndex, mode);
     if (err != OK) {
         ALOGE("[%s] setPortMode on %s to %s failed w/ err %d",
@@ -818,6 +820,8 @@ status_t ACodec::setPortMode(int32_t portIndex, IOMX::PortMode mode) {
                 portIndex == kPortIndexInput ? "input" : "output",
                 asString(mode),
                 err);
+
+        ALOGE("AdrianDC setPortMode ERR");
         return err;
     }
 
@@ -828,38 +832,48 @@ status_t ACodec::setPortMode(int32_t portIndex, IOMX::PortMode mode) {
     // returns Gralloc source. Pretend that we are; this will force us to use nBufferSize.
     if (mode == IOMX::kPortModeDynamicGrallocSource) {
         mPortMode[portIndex] = IOMX::kPortModeDynamicCameraSource;
+        ALOGE("AdrianDC setPortMode %d %d", mPortMode[portIndex], portIndex);
+        ALOGE("AdrianDC For this specific case we could be using camera source even if storeMetaDataInBuffers");
     }
 #endif
 
+    ALOGE("AdrianDC setPortMode OUT mode %d (%s)", mPortMode[portIndex], mComponentName.c_str());
     return OK;
 }
 
 status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
+    ALOGE("AdrianDC allocateBuffersOnPort 1 -- %s", portIndex == kPortIndexInput ? "INPUT" : "OUTPUT");
     CHECK(portIndex == kPortIndexInput || portIndex == kPortIndexOutput);
 
+    ALOGE("AdrianDC allocateBuffersOnPort 2");
     if (getTrebleFlag()) {
         CHECK(mAllocator[portIndex] == NULL);
     } else {
         CHECK(mDealer[portIndex] == NULL);
     }
     CHECK(mBuffers[portIndex].isEmpty());
+    ALOGE("AdrianDC allocateBuffersOnPort 3");
 
     status_t err;
     if (mNativeWindow != NULL && portIndex == kPortIndexOutput) {
+        ALOGE("AdrianDC allocateBuffersOnPort 4 %d mIsEncoder %d", storingMetadataInDecodedBuffers(), mIsEncoder);
         if (storingMetadataInDecodedBuffers()) {
             err = allocateOutputMetadataBuffers();
         } else {
             err = allocateOutputBuffersFromNativeWindow();
         }
     } else {
+        ALOGE("AdrianDC allocateBuffersOnPort 5");
         OMX_PARAM_PORTDEFINITIONTYPE def;
         InitOMXParams(&def);
         def.nPortIndex = portIndex;
 
         err = mOMXNode->getParameter(
                 OMX_IndexParamPortDefinition, &def, sizeof(def));
+        ALOGE("AdrianDC allocateBuffersOnPort 5");
 
         if (err == OK) {
+            ALOGE("AdrianDC allocateBuffersOnPort 6 %d (%s)", mPortMode[portIndex], mComponentName.c_str());
             const IOMX::PortMode &mode = mPortMode[portIndex];
             size_t bufSize = def.nBufferSize;
             // Always allocate VideoNativeMetadata if using ANWBuffer.
@@ -876,6 +890,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
                 bufSize = max(sizeof(VideoGrallocMetadata), sizeof(VideoNativeMetadata));
 #endif
             }
+ALOGE("AdrianDC bufSize = %d  mode = %d // %d / %d", bufSize, mode, IOMX::kPortModeDynamicGrallocSource, IOMX::kPortModeDynamicANWBuffer);
 
             size_t conversionBufferSize = 0;
 
@@ -892,6 +907,11 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
             size_t alignment = MemoryDealer::getAllocationAlignment();
 
             ALOGV("[%s] Allocating %u buffers of size %zu (from %u using %s) on %s port",
+                    mComponentName.c_str(),
+                    def.nBufferCountActual, bufSize, def.nBufferSize, asString(mode),
+                    portIndex == kPortIndexInput ? "input" : "output");
+
+            ALOGE("AdrianDC [%s] Allocating %u buffers of size %zu (from %u using %s) on %s port",
                     mComponentName.c_str(),
                     def.nBufferCountActual, bufSize, def.nBufferSize, asString(mode),
                     portIndex == kPortIndexInput ? "input" : "output");
@@ -1046,10 +1066,12 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
             }
         }
     }
+    ALOGE("AdrianDC allocateBuffersOnPort 4");
 
     if (err != OK) {
         return err;
     }
+    ALOGE("AdrianDC allocateBuffersOnPort 4");
 
     std::vector<ACodecBufferChannel::BufferAndId> array(mBuffers[portIndex].size());
     for (size_t i = 0; i < mBuffers[portIndex].size(); ++i) {
@@ -1062,6 +1084,7 @@ status_t ACodec::allocateBuffersOnPort(OMX_U32 portIndex) {
     } else {
         TRESPASS();
     }
+    ALOGE("AdrianDC allocateBuffersOnPort 4");
 
     return OK;
 }
@@ -1630,6 +1653,7 @@ status_t ACodec::freeBuffer(OMX_U32 portIndex, size_t i) {
     status_t err = OK;
 
     // there should not be any fences in the metadata
+    ALOGE("AdrianDC freeBuffer %d (%s)", mPortMode[portIndex], mComponentName.c_str());
     if (mPortMode[portIndex] == IOMX::kPortModeDynamicANWBuffer && info->mCodecData != NULL
             && info->mCodecData->size() >= sizeof(VideoNativeMetadata)) {
         int fenceFd = ((VideoNativeMetadata *)info->mCodecData->base())->nFenceFd;
@@ -1667,6 +1691,7 @@ status_t ACodec::freeBuffer(OMX_U32 portIndex, size_t i) {
 
     // remove buffer even if mOMXNode->freeBuffer fails
     mBuffers[portIndex].removeAt(i);
+    ALOGE("AdrianDC freeBuffer OUT");
     return err;
 }
 
@@ -1738,6 +1763,7 @@ status_t ACodec::configureCodec(
 
     mIsEncoder = encoder;
 
+    ALOGE("AdrianDC configureCodec Messup %d with %d (%s)", mPortMode[kPortIndexInput], IOMX::kPortModePresetByteBuffer, mComponentName.c_str());
     mPortMode[kPortIndexInput] = IOMX::kPortModePresetByteBuffer;
     mPortMode[kPortIndexOutput] = IOMX::kPortModePresetByteBuffer;
 
@@ -1766,6 +1792,7 @@ status_t ACodec::configureCodec(
     if (encoder
             && msg->findInt32("android._input-metadata-buffer-type", &storeMeta)
             && storeMeta != kMetadataBufferTypeInvalid) {
+        ALOGE("AdrianDC configureCodec storeMeta %d", storeMeta);
         IOMX::PortMode mode;
         if (storeMeta == kMetadataBufferTypeNativeHandleSource) {
             mode = IOMX::kPortModeDynamicNativeHandle;
@@ -1782,17 +1809,21 @@ status_t ACodec::configureCodec(
         } else {
             return BAD_VALUE;
         }
+        ALOGE("AdrianDC configureCodec mode %d", mode);
 
         err = setPortMode(kPortIndexInput, mode);
         if (err != OK) {
+            ALOGE("AdrianDC configureCodec setPortMode fail");
             return err;
         }
+        ALOGE("AdrianDC configureCodec setPortMode ok = %d / %d (%s)", mPortMode[kPortIndexInput], kPortIndexInput, mComponentName.c_str());
 
 #if !defined(TARGET_USES_MEDIA_EXTENSIONS) && defined(TARGET_HAS_LEGACY_CAMERA_HAL1)
         // For this specific case we could be using camera source even if storeMetaDataInBuffers
         // returns Gralloc source. Pretend that we are; this will force us to use nBufferSize.
         if (mode == IOMX::kPortModeDynamicGrallocSource) {
             mode = IOMX::kPortModeDynamicANWBuffer;
+            ALOGE("AdrianDC For this specific case we could be using camera source even if storeMetaDataInBuffers");
         }
 #endif
 
@@ -1838,13 +1869,16 @@ status_t ACodec::configureCodec(
         OMX_BOOL enable = (OMX_BOOL) (prependSPSPPS
             && msg->findInt32("android._store-metadata-in-buffers-output", &storeMeta)
             && storeMeta != 0);
+        ALOGE("AdrianDC configureCodec android._store-metadata-in-buffers-output %d enable %d prependSPSPPS %d", storeMeta, enable, prependSPSPPS);
         if (mFlags & kFlagIsSecure) {
             enable = OMX_TRUE;
         }
 
 #if !defined(TARGET_USES_MEDIA_EXTENSIONS) && defined(TARGET_HAS_LEGACY_CAMERA_HAL1)
+        ALOGE("AdrianDC configureCodec tPortMode(kPortIndexOutput, kPortModeDynamicNativeHandle);");
         err = setPortMode(kPortIndexOutput, IOMX::kPortModeDynamicNativeHandle);
 #else
+        ALOGE("AdrianDC configureCodec tPortMode(kPortIndexOutput, enable ?);");
         err = setPortMode(kPortIndexOutput, enable ?
                 IOMX::kPortModePresetSecureBuffer : IOMX::kPortModePresetByteBuffer);
 #endif
@@ -2055,30 +2089,37 @@ status_t ACodec::configureCodec(
         // determine need for software renderer
         bool usingSwRenderer = false;
         if (haveNativeWindow && mComponentName.startsWith("OMX.google.")) {
+            ALOGE("AdrianDC configureCodec haveNativeWindow OMX Google");
             usingSwRenderer = true;
             haveNativeWindow = false;
             (void)setPortMode(kPortIndexOutput, IOMX::kPortModePresetByteBuffer);
         } else if (haveNativeWindow && !storingMetadataInDecodedBuffers()) {
+            ALOGE("AdrianDC configureCodec haveNativeWindow !storingMetadataInDecodedBuffers > kPortModePresetANWBuffer");
             err = setPortMode(kPortIndexOutput, IOMX::kPortModePresetANWBuffer);
             if (err != OK) {
                 return err;
             }
         }
+        ALOGE("AdrianDC configureCodec useSwRenderer %d haveNativeWindow %d encoder %d", usingSwRenderer, haveNativeWindow, encoder);
 
         if (encoder) {
+            ALOGE("AdrianDC configureCodec encoder");
             err = setupVideoEncoder(mime, msg, outputFormat, inputFormat);
         } else {
+            ALOGE("AdrianDC configureCodec decoder");
             err = setupVideoDecoder(mime, msg, haveNativeWindow, usingSwRenderer, outputFormat);
         }
+        ALOGE("AdrianDC configureCodec err %d", err);
 
         if (err != OK) {
+            ALOGE("AdrianDC configureCodec err %d", err);
             return err;
         }
+        ALOGE("AdrianDC configureCodec haveNativeWindow %d", haveNativeWindow);
 
         if (haveNativeWindow) {
             mNativeWindow = static_cast<Surface *>(obj.get());
-
-            // fallback for devices that do not handle flex-YUV for native buffers
+            ALOGE("AdrianDC haveNativeWindow one");
             int32_t requestedColorFormat = OMX_COLOR_FormatUnused;
             if (msg->findInt32("color-format", &requestedColorFormat) &&
                     requestedColorFormat == OMX_COLOR_FormatYUV420Flexible) {
@@ -2123,6 +2164,7 @@ status_t ACodec::configureCodec(
             outputFormat->setInt32("using-sw-renderer", 1);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         int32_t numChannels, sampleRate;
         if (!msg->findInt32("channel-count", &numChannels)
                 || !msg->findInt32("sample-rate", &sampleRate)) {
@@ -2136,6 +2178,7 @@ status_t ACodec::configureCodec(
                     numChannels);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         int32_t numChannels, sampleRate;
         if (!msg->findInt32("channel-count", &numChannels)
                 || !msg->findInt32("sample-rate", &sampleRate)) {
@@ -2190,11 +2233,14 @@ status_t ACodec::configureCodec(
                     pcmLimiterEnable);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_NB)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         err = setupAMRCodec(encoder, false /* isWAMR */, bitRate);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_WB)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         err = setupAMRCodec(encoder, true /* isWAMR */, bitRate);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_G711_ALAW)
             || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_G711_MLAW)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         // These are PCM-like formats with a fixed sample rate but
         // a variable number of channels.
 
@@ -2209,6 +2255,7 @@ status_t ACodec::configureCodec(
             err = setupG711Codec(encoder, sampleRate, numChannels);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         int32_t numChannels = 0, sampleRate = 0, compressionLevel = -1;
         if (encoder &&
                 (!msg->findInt32("channel-count", &numChannels)
@@ -2238,6 +2285,7 @@ status_t ACodec::configureCodec(
                     encoder, numChannels, sampleRate, compressionLevel);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         int32_t numChannels, sampleRate;
         if (encoder
                 || !msg->findInt32("channel-count", &numChannels)
@@ -2247,6 +2295,7 @@ status_t ACodec::configureCodec(
             err = setupRawAudioFormat(kPortIndexInput, sampleRate, numChannels, pcmEncoding);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC3)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         int32_t numChannels;
         int32_t sampleRate;
         if (!msg->findInt32("channel-count", &numChannels)
@@ -2256,6 +2305,7 @@ status_t ACodec::configureCodec(
             err = setupAC3Codec(encoder, numChannels, sampleRate);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_EAC3)) {
+        ALOGE("AdrianDC configureCodec mime %s", mime);
         int32_t numChannels;
         int32_t sampleRate;
         if (!msg->findInt32("channel-count", &numChannels)
@@ -2266,7 +2316,9 @@ status_t ACodec::configureCodec(
         }
     }
 
+    ALOGE("AdrianDC configureCodec done ime %s err %d", mime, err);
     if (err != OK) {
+        ALOGE("AdrianDC configureCodec done ime %s err %d", mime, err);
         return err;
     }
 
@@ -2287,17 +2339,22 @@ status_t ACodec::configureCodec(
     int32_t maxInputSize;
     if (msg->findInt32("max-input-size", &maxInputSize)) {
         err = setMinBufferSize(kPortIndexInput, (size_t)maxInputSize);
+        ALOGE("AdrianDC configureCodec 1 err = %d", err);
         err = OK; // ignore error
     } else if (!strcmp("OMX.Nvidia.aac.decoder", mComponentName.c_str())) {
         err = setMinBufferSize(kPortIndexInput, 8192);  // XXX
+        ALOGE("AdrianDC configureCodec 2 err = %d", err);
         err = OK; // ignore error
     }
+    ALOGE("AdrianDC configureCodec done maxInputSize %d", maxInputSize);
 
     int32_t priority;
     if (msg->findInt32("priority", &priority)) {
         err = setPriority(priority);
+        ALOGE("AdrianDC configureCodec 3 err = %d", err);
         err = OK; // ignore error
     }
+    ALOGE("AdrianDC configureCodec done priority %d err = %d", priority, err);
 
     int32_t rateInt = -1;
     float rateFloat = -1;
@@ -2309,6 +2366,7 @@ status_t ACodec::configureCodec(
         err = setOperatingRate(rateFloat, video);
         err = OK; // ignore errors
     }
+    ALOGE("AdrianDC configureCodec done setVendorParameters err %d", err);
 
     if (err == OK) {
         err = setVendorParameters(msg);
@@ -2320,15 +2378,19 @@ status_t ACodec::configureCodec(
     // NOTE: both mBaseOutputFormat and mOutputFormat are outputFormat to signal first frame.
     mBaseOutputFormat = outputFormat;
     mLastOutputFormat.clear();
+    ALOGE("AdrianDC configureCodec mLastOutputFormat inputFormat");
 
+    ALOGE("AdrianDC configureCodec done getPortFormat IN");
     err = getPortFormat(kPortIndexInput, inputFormat);
     if (err == OK) {
+        ALOGE("AdrianDC configureCodec done getPortFormat OUT");
         err = getPortFormat(kPortIndexOutput, outputFormat);
         if (err == OK) {
             mInputFormat = inputFormat;
             mOutputFormat = outputFormat;
         }
     }
+    ALOGE("AdrianDC configureCodec done getPortFormat ");
 
     // create data converters if needed
     if (!video && err == OK) {
@@ -2347,6 +2409,7 @@ status_t ACodec::configureCodec(
             }
         }
     }
+    ALOGE("AdrianDC configureCodec done err %d", err);
 
     return err;
 }
@@ -4808,16 +4871,20 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
     InitOMXParams(&def);
     def.nPortIndex = portIndex;
 
+    ALOGE("AdrianDC getPortFormat port %d", portIndex);
     status_t err = mOMXNode->getParameter(OMX_IndexParamPortDefinition, &def, sizeof(def));
     if (err != OK) {
+       ALOGE("AdrianDC getPortFormat err %d", err);
         return err;
     }
 
+    ALOGE("AdrianDC dir %d def.eDir %d", portIndex == kPortIndexOutput ? OMX_DirOutput : OMX_DirInput, def.eDir);
     if (def.eDir != (portIndex == kPortIndexOutput ? OMX_DirOutput : OMX_DirInput)) {
         ALOGE("unexpected dir: %s(%d) on %s port", asString(def.eDir), def.eDir, niceIndex);
         return BAD_VALUE;
     }
 
+    ALOGE("AdrianDC def.eDomain %d", def.eDomain);
     switch (def.eDomain) {
         case OMX_PortDomainVideo:
         {
@@ -5248,6 +5315,7 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
             return BAD_TYPE;
     }
 
+    ALOGE("AdrianDC getPortFormat getVendorParameters");
     return getVendorParameters(portIndex, notify);
 }
 
@@ -5713,6 +5781,7 @@ void ACodec::BaseState::postFillThisBuffer(BufferInfo *info) {
 }
 
 void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
+    ALOGE("AdrianDC onInputBufferFilled");
     IOMX::buffer_id bufferID;
     CHECK(msg->findInt32("buffer-id", (int32_t*)&bufferID));
     sp<MediaCodecBuffer> buffer;
@@ -5735,21 +5804,25 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
         err = ERROR_END_OF_STREAM;
     }
 
+    ALOGE("AdrianDC onInputBufferFilled 1");
     BufferInfo *info = mCodec->findBufferByID(kPortIndexInput, bufferID);
     BufferInfo::Status status = BufferInfo::getSafeStatus(info);
     if (status != BufferInfo::OWNED_BY_UPSTREAM) {
+        ALOGE("AdrianDC onInputBufferFilled 2");
         ALOGE("Wrong ownership in IBF: %s(%d) buffer #%u", _asString(status), status, bufferID);
         mCodec->dumpBuffers(kPortIndexInput);
         mCodec->signalError(OMX_ErrorUndefined, FAILED_TRANSACTION);
         return;
     }
 
+    ALOGE("AdrianDC onInputBufferFilled 3");
     info->mStatus = BufferInfo::OWNED_BY_US;
     info->mData = buffer;
 
     switch (mode) {
         case KEEP_BUFFERS:
         {
+            ALOGE("AdrianDC onInputBufferFilled 4");
             if (eos) {
                 if (!mCodec->mPortEOS[kPortIndexInput]) {
                     mCodec->mPortEOS[kPortIndexInput] = true;
@@ -5761,13 +5834,16 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
 
         case RESUBMIT_BUFFERS:
         {
+            ALOGE("AdrianDC onInputBufferFilled 5");
             if (buffer != NULL && !mCodec->mPortEOS[kPortIndexInput]) {
                 // Do not send empty input buffer w/o EOS to the component.
+                ALOGE("AdrianDC onInputBufferFilled 51");
                 if (buffer->size() == 0 && !eos) {
                     postFillThisBuffer(info);
                     break;
                 }
 
+                ALOGE("AdrianDC onInputBufferFilled 52");
                 int64_t timeUs;
                 CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
@@ -5779,6 +5855,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                         ALOGV("[%s] is legacy VP9 decoder. Ignore %u codec specific data",
                             mCodec->mComponentName.c_str(), bufferID);
                         postFillThisBuffer(info);
+                        ALOGE("AdrianDC onInputBufferFilled 53");
                         break;
                     }
                     flags |= OMX_BUFFERFLAG_CODECCONFIG;
@@ -5788,6 +5865,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     flags |= OMX_BUFFERFLAG_EOS;
                 }
 
+                ALOGE("AdrianDC onInputBufferFilled 54");
                 size_t size = buffer->size();
                 size_t offset = buffer->offset();
                 if (buffer->base() != info->mCodecData->base()) {
@@ -5803,6 +5881,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     status_t err = converter->convert(buffer, info->mCodecData);
                     if (err != OK) {
                         mCodec->signalError(OMX_ErrorUndefined, err);
+                        ALOGE("AdrianDC onInputBufferFilled 55");
                         return;
                     }
                     size = info->mCodecData->size();
@@ -5847,11 +5926,19 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                 }
                 info->checkReadFence("onInputBufferFilled");
 
+                ALOGE("AdrianDC onInputBufferFilled 57 %d, %d (%s)", mCodec->mPortMode[kPortIndexInput],
+                     kPortIndexInput, mCodec->mComponentName.c_str());
                 status_t err2 = OK;
                 switch (mCodec->mPortMode[kPortIndexInput]) {
+                case IOMX::kPortModeDynamicCameraSource:
+                    ALOGE("AdrianDC kPortModeDynamicCameraSource break");
+                    break;
                 case IOMX::kPortModePresetByteBuffer:
+                    ALOGE("AdrianDC kPortModePresetByteBuffer break");
                 case IOMX::kPortModePresetANWBuffer:
+                    ALOGE("AdrianDC kPortModePresetANWBuffer break");
                 case IOMX::kPortModePresetSecureBuffer:
+                    ALOGE("AdrianDC kPortModePresetSecureBuffer break");
                     {
                         err2 = mCodec->mOMXNode->emptyBuffer(
                             bufferID, info->mCodecData, flags, timeUs, info->mFenceFd);
@@ -5860,6 +5947,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
 #ifndef OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
 #if !defined(TARGET_USES_MEDIA_EXTENSIONS) && defined(TARGET_HAS_LEGACY_CAMERA_HAL1)
                 case IOMX::kPortModeDynamicGrallocSource:
+                    ALOGE("AdrianDC kPortModeDynamicGrallocSource break");
                     if (info->mCodecData->size() >= sizeof(VideoGrallocMetadata)) {
                         //VideoGrallocMetadata *vgmd =
                         //    (VideoGrallocMetadata*)info->mCodecData->base();
@@ -5870,6 +5958,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     break;
 #endif
                 case IOMX::kPortModeDynamicNativeHandle:
+                    ALOGE("AdrianDC kPortModeDynamicNativeHandle break");
                     if (info->mCodecData->size() >= sizeof(VideoNativeHandleMetadata)) {
                         VideoNativeHandleMetadata *vnhmd =
                             (VideoNativeHandleMetadata*)info->mCodecData->base();
@@ -5880,6 +5969,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     }
                     break;
                 case IOMX::kPortModeDynamicANWBuffer:
+                    ALOGE("AdrianDC kPortModeDynamicANWBuffer break");
                     if (info->mCodecData->size() >= sizeof(VideoNativeMetadata)) {
                         VideoNativeMetadata *vnmd = (VideoNativeMetadata*)info->mCodecData->base();
                         sp<GraphicBuffer> graphicBuffer = GraphicBuffer::from(vnmd->pBuffer);
@@ -5889,6 +5979,7 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     break;
 #endif
                 default:
+                    ALOGE("AdrianDC marshall break");
                     ALOGW("Can't marshall %s data in %zu sized buffers in %zu-bit mode",
                             asString(mCodec->mPortMode[kPortIndexInput]),
                             info->mCodecData->size(),
@@ -5915,7 +6006,9 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     mCodec->mPortEOS[kPortIndexInput] = true;
                     mCodec->mInputEOSResult = err;
                 }
+                ALOGE("AdrianDC onInputBufferFilled 58");
             } else if (!mCodec->mPortEOS[kPortIndexInput]) {
+                ALOGE("AdrianDC onInputBufferFilled 591");
                 if (err != OK && err != ERROR_END_OF_STREAM) {
                     ALOGV("[%s] Signalling EOS on the input port due to error %d",
                          mCodec->mComponentName.c_str(), err);
@@ -5939,14 +6032,18 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
 
                 mCodec->mPortEOS[kPortIndexInput] = true;
                 mCodec->mInputEOSResult = err;
+                ALOGE("AdrianDC onInputBufferFilled 592");
             }
+            ALOGE("AdrianDC onInputBufferFilled 59");
             break;
         }
 
         case FREE_BUFFERS:
+            ALOGE("AdrianDC onInputBufferFilled 6");
             break;
 
         default:
+            ALOGE("AdrianDC onInputBufferFilled 7");
             ALOGE("invalid port mode: %d", mode);
             break;
     }
@@ -6314,6 +6411,8 @@ void ACodec::UninitializedState::stateEntered() {
     mCodec->mOMX.clear();
     mCodec->mOMXNode.clear();
     mCodec->mFlags = 0;
+    ALOGE("AdrianDC stateEntered Messed up %d with %d (%s)", mCodec->mPortMode[kPortIndexInput],
+          IOMX::kPortModePresetByteBuffer, mCodec->mComponentName.c_str());
     mCodec->mPortMode[kPortIndexInput] = IOMX::kPortModePresetByteBuffer;
     mCodec->mPortMode[kPortIndexOutput] = IOMX::kPortModePresetByteBuffer;
     mCodec->mConverter[0].clear();
@@ -6863,18 +6962,26 @@ void ACodec::LoadedToIdleState::stateEntered() {
 }
 
 status_t ACodec::LoadedToIdleState::allocateBuffers() {
+    ALOGE("AdrianDC allocateBuffers 1");
     status_t err = mCodec->allocateBuffersOnPort(kPortIndexInput);
+    ALOGE("AdrianDC allocateBuffers 2 err = %d", err);
     if (err != OK) {
+        ALOGE("AdrianDC allocateBuffers 2 ERR");
         return err;
     }
+    ALOGE("AdrianDC allocateBuffers 3");
 
     err = mCodec->allocateBuffersOnPort(kPortIndexOutput);
+    ALOGE("AdrianDC allocateBuffers 4");
     if (err != OK) {
+        ALOGE("AdrianDC allocateBuffers 4 ERR");
         return err;
     }
+    ALOGE("AdrianDC allocateBuffers 5");
 
     mCodec->mCallback->onStartCompleted();
 
+    ALOGE("AdrianDC allocateBuffers 6");
     return OK;
 }
 
@@ -7673,40 +7780,49 @@ status_t ACodec::setVendorParameters(const sp<AMessage> &params) {
 }
 
 status_t ACodec::getVendorParameters(OMX_U32 portIndex, sp<AMessage> &format) {
+    ALOGE("AdrianDC getVendorParameters 1");
     constexpr char prefix[] = "vendor.";
     constexpr size_t prefixLength = sizeof(prefix) - 1;
     char key[sizeof(OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE::cName) +
             sizeof(OMX_CONFIG_ANDROID_VENDOR_PARAMTYPE::cKey) + prefixLength];
     strcpy(key, prefix);
+    ALOGE("AdrianDC getVendorParameters 2 %s ==== %s", key, prefix);
 
     // don't try again if component does not have vendor extensions
     if (mVendorExtensionsStatus == kExtensionsNone) {
         return OK;
     }
+    ALOGE("AdrianDC getVendorParameters 3");
 
     for (VendorExtension ext : VendorExtensions(mOMXNode)) {
+        ALOGE("AdrianDC getVendorParameters 4");
         OMX_CONFIG_ANDROID_VENDOR_EXTENSIONTYPE *config = ext.config;
         if (config == nullptr) {
             return ext.status;
         }
+        ALOGE("AdrianDC getVendorParameters 5");
 
         mVendorExtensionsStatus = kExtensionsExist;
 
         if (config->eDir != (portIndex == kPortIndexInput ? OMX_DirInput : OMX_DirOutput)) {
             continue;
         }
+        ALOGE("AdrianDC getVendorParameters 6");
 
         config->cName[sizeof(config->cName) - 1] = '\0'; // null-terminate name
         strcpy(key + prefixLength, (const char *)config->cName);
         size_t nameLength = strlen(key);
         key[nameLength] = '.';
+        ALOGE("AdrianDC getVendorParameters 7 %s === %s (%d)", key, config->cName, config->nParamCount);
 
         for (size_t paramIndex = 0; paramIndex < config->nParamCount; ++paramIndex) {
             // null-terminate param key
             config->param[paramIndex].cKey[sizeof(config->param[0].cKey) - 1] = '\0';
             strcpy(key + nameLength + 1, (const char *)config->param[paramIndex].cKey);
             removeTrailingTags(key, nameLength, "value");
+            ALOGE("AdrianDC getVendorParameters 8 %s", key);
             if (config->param[paramIndex].bSet) {
+                ALOGE("AdrianDC getVendorParameters 9 %d", config->param[paramIndex].eValueType);
                 switch (config->param[paramIndex].eValueType) {
                 case OMX_AndroidVendorValueInt32:
                 {
@@ -7730,11 +7846,15 @@ status_t ACodec::getVendorParameters(OMX_U32 portIndex, sp<AMessage> &format) {
                 }
             }
         }
+        ALOGE("AdrianDC getVendorParameters 10");
     }
 
+    ALOGE("AdrianDC getVendorParameters 11");
     if (mVendorExtensionsStatus == kExtensionsUnchecked) {
+    ALOGE("AdrianDC getVendorParameters 12");
         mVendorExtensionsStatus = kExtensionsNone;
     }
+    ALOGE("AdrianDC getVendorParameters 13");
 
     return OK;
 }

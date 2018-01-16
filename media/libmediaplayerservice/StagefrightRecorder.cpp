@@ -1608,6 +1608,7 @@ status_t StagefrightRecorder::setupCameraSource(
 
     CHECK(mFrameRate != -1);
 
+    ALOGE("AdrianDC setupCameraSource");
     mMetaDataStoredInVideoBuffers =
         (*cameraSource)->metaDataStoredInVideoBuffers();
 
@@ -1733,6 +1734,7 @@ status_t StagefrightRecorder::setupVideoEncoder(
         format->setInt32("android._prefer-b-frames", preferBFrames);
     }
 
+    ALOGE("AdrianDC setupVideoEncoder %d %d", mMetaDataStoredInVideoBuffers, kMetadataBufferTypeInvalid);
     if (mMetaDataStoredInVideoBuffers != kMetadataBufferTypeInvalid) {
         format->setInt32("android._input-metadata-buffer-type", mMetaDataStoredInVideoBuffers);
     }
@@ -1740,14 +1742,17 @@ status_t StagefrightRecorder::setupVideoEncoder(
     uint32_t flags = 0;
     if (cameraSource == NULL) {
         flags |= MediaCodecSource::FLAG_USE_SURFACE_INPUT;
+        ALOGE("AdrianDC cameraSource == NULL flags");
     } else {
         // require dataspace setup even if not using surface input
         format->setInt32("android._using-recorder", 1);
+        ALOGE("AdrianDC android._using-recorder 1");
     }
 
     sp<MediaCodecSource> encoder = MediaCodecSource::Create(
             mLooper, format, cameraSource, mPersistentSurface, flags);
     if (encoder == NULL) {
+        ALOGE("AdrianDC Failed to create video encoder");
         ALOGE("Failed to create video encoder");
         // When the encoder fails to be created, we need
         // release the camera source due to the camera's lock
@@ -1757,11 +1762,14 @@ status_t StagefrightRecorder::setupVideoEncoder(
         }
         return UNKNOWN_ERROR;
     }
+    ALOGE("AdrianDC Success to create video encoder");
 
     if (cameraSource == NULL) {
+        ALOGE("AdrianDC cameraSource == NULL");
         mGraphicBufferProducer = encoder->getGraphicBufferProducer();
     }
 
+    ALOGE("AdrianDC encoder");
     *source = encoder;
 
     return OK;
